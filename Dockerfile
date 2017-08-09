@@ -21,10 +21,11 @@ ENV PYTHON_BIN_PATH /opt/conda/bin/python
 ENV PYTHON_LIB_PATH /opt/conda/lib/python2.7/site-packages
 ENV TENSORBOARD_LOG_DIR /workspace
 
-RUN echo 'PS1="\u@\h:\w\\$ \[$(tput sgr0)\]"' >> /root/.bashrc
 
 # Python binary and source dependencies and Development tools
-RUN yum install -y curl wget bzip2 gnupg2 sqlite3 \
+RUN echo 'PS1="\u@\h:\w\\$ \[$(tput sgr0)\]"' >> /root/.bashrc \
+    && mkdir -p /tf \
+    && yum install -y curl wget bzip2 gnupg2 sqlite3 \
     && yum install -y epel-release tar git \
     && yum clean all -y \
     && chgrp -R root /opt \
@@ -37,7 +38,7 @@ RUN yum install -y curl wget bzip2 gnupg2 sqlite3 \
     && bash Miniconda3-4.2.12-Linux-x86_64.sh -b -p $CONDA_DIR \
     && rm Miniconda3-4.2.12-Linux-x86_64.sh \
     && export PATH=/opt/conda/bin:$PATH \
-    && yum install -y gcc gcc-c++ glibc-devel openssl-devel \
+    && yum install -y gcc gcc-c++ glibc-devel \
     && /opt/conda/bin/conda install --quiet --yes python=$NB_PYTHON_VER 'nomkl' \
                 'ipywidgets=5.2*' \
                 'matplotlib=1.5*' \
@@ -48,21 +49,18 @@ RUN yum install -y curl wget bzip2 gnupg2 sqlite3 \
                 pandas \
                 'dill=0.2*' \
                 numpy \
+                jupyter \
+                notebook \
                 scikit-learn \
                 tensorflow \
                 psutil \
                 pillow \
                 nltk \
                 gitpython \
-                requests 
-
-RUN mkdir -p /tf
-COPY tensorflow_model_server /tf/
-
-ENV PATH /opt/conda/bin:$PATH
-
-# cleanup
-RUN rm -rf /root/.npm \
+                requests \
+    && yum erase -y gcc gcc-c++ glibc-devel \
+    && yum clean all -y \
+    && rm -rf /root/.npm \
     && rm -rf /root/.cache \
     && rm -rf /root/.config \
     && rm -rf /root/.local \
@@ -71,31 +69,32 @@ RUN rm -rf /root/.npm \
     && usermod -g root $NB_USER \
     && chown -R $NB_USER $CONDA_DIR \
     && conda remove --quiet --yes --force qt pyqt \
-    && conda remove --quiet --yes --force --feature mkl ; conda clean -tipsy
+    && conda remove --quiet --yes --force --feature mkl ; conda clean -tipsy \
+    && mkdir /workspace && chown $NB_UID:root /workspace && chmod 1777 /workspace \
+    && mkdir -p -m 700 /home/$NB_USER/.jupyter/ \
+    && echo "c.NotebookApp.ip = '*'" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.open_browser = False" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.notebook_dir = '/workspace'" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
+    && chown -R $NB_UID:root /home/$NB_USER \
+    && chmod g+rwX,o+rX -R /home/$NB_USER
 
+ENV PATH /opt/conda/bin:$PATH
 
-RUN mkdir /workspace && chown $NB_UID:root /workspace && chmod 1777 /workspace
+# TensorBoard # IPython
+EXPOSE 6006 8888
 
-# TensorBoard
-EXPOSE 6006
-# IPython
-EXPOSE 8888
-
-RUN mkdir -p -m 700 /home/$NB_USER/ && \
-    chown -R $NB_UID:root /home/$NB_USER && \
-    chmod g+rwX,o+rX -R /home/$NB_USER
-
-LABEL io.k8s.description="Tensorflow Slim image." \
-      io.k8s.display-name="Tensorflow Slim image." \
+LABEL io.k8s.description="Tensorflow Jupyter Notebook." \
+      io.k8s.display-name="Tensorflow Jupyter Notebook." \
       io.openshift.expose-services="8888:http,6006:http"
 
 ENV TINI_VERSION v0.9.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
 RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 0527A9B7 && gpg --verify /tini.asc
-ADD start-slim.sh /start-slim.sh
+ADD start.sh /start.sh
+ADD tensorflow_model_server /tf/tensorflow_model_server
 
-RUN chmod +x /tini /start-slim.sh
+RUN chmod +x /tini /start.sh
 
 ENV HOME /home/$NB_USER
 USER $NB_UID
@@ -107,4 +106,4 @@ WORKDIR /workspace
 
 ENTRYPOINT ["/tini", "--"]
 
-CMD ["/start-slim.sh"]
+CMD ["/start.sh"]

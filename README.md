@@ -1,2 +1,3 @@
-# tensorflow-slim
-tensorflow-slim image
+# tf-base-notebook
+tensorflow-base-notebook 
+
