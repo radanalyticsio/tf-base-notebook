@@ -23,6 +23,7 @@ ENV PYTHON_BIN_PATH /opt/conda/bin/python
 ENV PYTHON_LIB_PATH /opt/conda/lib/python2.7/site-packages
 ENV TENSORBOARD_LOG_DIR /workspace
 
+ADD fix-permissions.sh /usr/local/bin/fix-permissions
 
 # Python binary and source dependencies and Development tools
 RUN echo 'PS1="\u@\h:\w\\$ \[$(tput sgr0)\]"' >> /root/.bashrc \
@@ -43,9 +44,10 @@ USER $NB_USER
 # which will likely try to create files and directories in PWD and
 # error out if it cannot. 
 # 
-RUN mkdir /home/$NB_USER/workspace
+RUN 
 
-RUN cd /tmp \
+RUN mkdir /home/$NB_USER/workspace \
+    && cd /tmp \
     && wget -q https://repo.continuum.io/miniconda/Miniconda3-4.2.12-Linux-x86_64.sh \
     && echo d0c7c71cc5659e54ab51f2005a8d96f3 Miniconda3-4.2.12-Linux-x86_64.sh | md5sum -c - \
     && bash Miniconda3-4.2.12-Linux-x86_64.sh -b -p $CONDA_DIR \
@@ -71,7 +73,9 @@ RUN cd /tmp \
                 gitpython \
                 requests \
     && /opt/conda/bin/conda remove --quiet --yes --force qt pyqt \
-    && /opt/conda/bin/conda clean -tipsy 
+    && /opt/conda/bin/conda clean -tipsy \
+    && fix-permissions /opt/conda \
+    && fix-permissions /home/$NB_USER 
 
 
 USER root
@@ -96,11 +100,8 @@ RUN wget -q https://github.com/krallin/tini/releases/download/${TINI_VERSION}/ti
     && echo "c.NotebookApp.ip = '*'" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
     && echo "c.NotebookApp.open_browser = False" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
     && echo "c.NotebookApp.notebook_dir = '/workspace'" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
-    && chown -R $NB_UID:root /home/$NB_USER \
-    && chmod g+rwX,o+rX -R /home/$NB_USER
-
-# Create jovyan user with UID=1000 and in the 'users' group
-RUN chown $NB_USER $CONDA_DIR
+    && fix-permissions /opt/conda \
+    && fix-permissions /home/$NB_USER
 
 LABEL io.k8s.description="Tensorflow Jupyter Notebook." \
       io.k8s.display-name="Tensorflow Jupyter Notebook." \
