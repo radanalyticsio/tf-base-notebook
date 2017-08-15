@@ -23,7 +23,6 @@ ENV PYTHON_BIN_PATH /opt/conda/bin/python
 ENV PYTHON_LIB_PATH /opt/conda/lib/python2.7/site-packages
 ENV TENSORBOARD_LOG_DIR /workspace
 
-ADD fix-permissions.sh /usr/local/bin/fix-permissions
 
 # Python binary and source dependencies and Development tools
 RUN echo 'PS1="\u@\h:\w\\$ \[$(tput sgr0)\]"' >> /root/.bashrc \
@@ -44,16 +43,16 @@ USER $NB_USER
 # which will likely try to create files and directories in PWD and
 # error out if it cannot. 
 # 
-RUN 
+ADD fix-permissions.sh /usr/local/bin/fix-permissions.sh 
 
-RUN mkdir /home/$NB_USER/workspace \
+RUN mkdir $HOME/workspace \
     && cd /tmp \
     && wget -q https://repo.continuum.io/miniconda/Miniconda3-4.2.12-Linux-x86_64.sh \
     && echo d0c7c71cc5659e54ab51f2005a8d96f3 Miniconda3-4.2.12-Linux-x86_64.sh | md5sum -c - \
     && bash Miniconda3-4.2.12-Linux-x86_64.sh -b -p $CONDA_DIR \
     && rm Miniconda3-4.2.12-Linux-x86_64.sh \
     && export PATH=/opt/conda/bin:$PATH \
-    && /opt/conda/bin/conda install --quiet --yes python=$NB_PYTHON_VER 'nomkl' \
+    && $CONDA_DIR/bin/conda install --quiet --yes python=$NB_PYTHON_VER 'nomkl' \
                 'ipywidgets=5.2*' \
                 'matplotlib=1.5*' \
                 'scipy=0.17*' \
@@ -72,10 +71,10 @@ RUN mkdir /home/$NB_USER/workspace \
                 nltk \
                 gitpython \
                 requests \
-    && /opt/conda/bin/conda remove --quiet --yes --force qt pyqt \
-    && /opt/conda/bin/conda clean -tipsy \
-    && fix-permissions /opt/conda \
-    && fix-permissions /home/$NB_USER 
+    && $CONDA_DIR/bin/conda remove --quiet --yes --force qt pyqt \
+    && $CONDA_DIR/bin/conda clean -tipsy \
+    && fix-permissions.sh $CONDA_DIR \
+    && fix-permissions.sh $HOME 
 
 
 USER root
@@ -95,13 +94,14 @@ RUN wget -q https://github.com/krallin/tini/releases/download/${TINI_VERSION}/ti
     && gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 0527A9B7 && gpg --verify /tmp/tini.asc \
     && mv /tmp/tini /usr/local/bin/tini \
     && chmod +x /usr/local/bin/tini \
-    && mkdir /workspace && chown $NB_UID:root /workspace && chmod 1777 /workspace \
-    && mkdir -p -m 700 /home/$NB_USER/.jupyter/ \
-    && echo "c.NotebookApp.ip = '*'" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
-    && echo "c.NotebookApp.open_browser = False" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
-    && echo "c.NotebookApp.notebook_dir = '/workspace'" >> /home/$NB_USER/.jupyter/jupyter_notebook_config.py \
-    && fix-permissions /opt/conda \
-    && fix-permissions /home/$NB_USER
+    && mkdir /workspace && chown $NB_UID:root /workspace \
+    && mkdir -p $HOME/.jupyter \
+    && echo "c.NotebookApp.ip = '*'" >> $HOME/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.open_browser = False" >> $HOME/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.notebook_dir = '/workspace'" >> $HOME/.jupyter/jupyter_notebook_config.py \
+    && fix-permissions.sh $CONDA_DIR \
+    && fix-permissions.sh /workspace \
+    && fix-permissions.sh $HOME
 
 LABEL io.k8s.description="Tensorflow Jupyter Notebook." \
       io.k8s.display-name="Tensorflow Jupyter Notebook." \
