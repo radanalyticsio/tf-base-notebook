@@ -10,7 +10,7 @@ This is a container image intended to make it easy to run Jupyter notebooks with
 
 ### As a standalone image
 
-`docker run -p -t 8888:8888 -p 6006:6006 submod/tf-base-notebook `
+`docker run -t -p 8888:8888 -p 6006:6006 submod/tf-base-notebook `
 
 For your convenience, binary image builds are available from Docker Hub.
 
@@ -22,6 +22,3 @@ For your convenience, binary image builds are available from Docker Hub.
 
 * As `nbuser` (uid 1011), add notebooks to `/workspace`.
 
-## Credits
-
-This image was based on [base-notebook](https://github.com/radanalyticsio/base-notebook).
