@@ -7,17 +7,18 @@ This is a container image intended to make it easy to run Jupyter notebooks with
 
 ## Build
 
-`docker build -t submod/tf-base-notebook .`
+`docker build -t radanalyticsio/tf-base-notebook .`
 
 ## Usage
 
 ### As a standalone image
 
-`docker run -t -p 8888:8888 -p 6006:6006 submod/tf-base-notebook `
+`docker run -t -p 8888:8888 -p 6006:6006 radanalyticsio/tf-base-notebook `
 
 For your convenience, binary image builds are available from Docker Hub.
 
-* Add the image `submod/tf-base-notebook` to an OpenShift project
+* Add the image `radanalyticsio/tf-base-notebook` to an OpenShift project. 
+```oc new-app radanalyticsio/tf-base-notebook ```
 * Set `JUPYTER_NOTEBOOK_PASSWORD` in the pod environment to something you can remember (this step is optional but highly recommended; if you don't do this, you'll need to trawl the logs for an access token for your new notebook)
 * Create a route to the pod
 
