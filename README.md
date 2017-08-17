@@ -1,3 +1,6 @@
+[![Docker build](https://img.shields.io/docker/automated/radanalyticsio/tf-base-notebook.svg)](https://hub.docker.com/r/radanalyticsio/tf-base-notebook)
+[![Layers info](https://images.microbadger.com/badges/image/radanalyticsio/tf-base-notebook.svg)](https://microbadger.com/images/radanalyticsio/tf-base-notebook)
+
 # tf-base-notebook
 
 This is a container image intended to make it easy to run Jupyter notebooks with Tensorflow on OpenShift. 
