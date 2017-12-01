@@ -11,6 +11,29 @@ This is a container image intended to make it easy to run Jupyter notebooks with
 
 ## Usage
 
+### In openshift
+
+create a project
+```
+oc new-project test
+```
+
+create the template 
+```
+oc create -f \
+https://raw.githubusercontent.com/radanalyticsio/tf-base-notebook/master/template.json
+```
+To create with tf notebook pod for CPU :
+```
+oc new-app --template jupyterapp 
+```
+
+or
+
+```
+oc new-app submod/tf-base-notebook -e JUPYTER_NOTEBOOK_PASSWORD=password
+
+```
 ### As a standalone image
 
 `docker run -t -p 8888:8888 -p 6006:6006 radanalyticsio/tf-base-notebook `

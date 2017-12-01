@@ -13,4 +13,10 @@ if [[ -n "$JUPYTER_NOTEBOOK_X_INCLUDE" ]]; then
 fi
 
 export PS1="\u@\h:\w\\$ \[$(tput sgr0)\]"
+export CUDA_HOME="/usr/local/cuda" 
+export CUDA_PATH="${CUDA_HOME}" 
+export PATH="${CUDA_HOME}/bin${PATH:+:${PATH}}" 
+export LD_LIBRARY_PATH="/usr/local/lib:${CUDA_HOME}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"; 
+echo -e “$CUDA_HOME \\n $CUDA_PATH \\n $LD_LIBRARY_PATH”
+
 exec jupyter notebook

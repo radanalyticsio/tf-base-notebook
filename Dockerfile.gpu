@@ -1,0 +1,147 @@
+# tensorflow/jupyter notebook
+FROM nvidia/cuda:9.0-cudnn7-devel-centos7
+
+MAINTAINER Subin Modeel <smodeel@redhat.com>
+
+USER root
+
+
+ENV CUDA_HOME="/usr/local/cuda" 
+ENV CUDA_PATH="/usr/local/cuda" 
+ENV PATH="/usr/local/cuda/bin${PATH:+:${PATH}}" 
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"; 
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs/:$LD_LIBRARY_PATH
+ENV TINI_VERSION v0.9.0
+ENV CUDA_VERSION 9.0.176
+ENV NVIDIA_CUDA_VERSION $CUDA_VERSION
+ENV CUDA_PKG_VERSION=$CUDA_VERSION-1
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+# nvidia-container-runtime
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+
+
+## taken/adapted from jupyter dockerfiles
+# Not essential, but wise to set the lang
+# Note: Users with other languages should set this in their derivative image
+ENV LANGUAGE en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LC_ALL en_US.UTF-8
+ENV PYTHONIOENCODING UTF-8
+ENV CONDA_DIR /opt/conda
+ENV PATH $CONDA_DIR/bin:$PATH
+ENV NB_USER=default
+ENV NB_UID=1001
+ENV HOME /home/$NB_USER
+ENV NB_PYTHON_VER=2.7
+## tensorflow ./configure options for Bazel
+ENV PYTHON_BIN_PATH /opt/conda/bin/python
+ENV PYTHON_LIB_PATH /opt/conda/lib/python2.7/site-packages
+ENV TENSORBOARD_LOG_DIR /workspace
+
+
+LABEL io.k8s.description="Tensorflow Jupyter GPU Notebook." \
+      io.k8s.display-name="Tensorflow JupyterGPU  Notebook." \
+      io.openshift.expose-services="8888:http,6006:http" \
+      io.openshift.tags="builder,python,tf-notebook" \
+      io.openshift.s2i.scripts-url="image:///usr/libexec/s2i" \
+      com.nvidia.cuda.version="${CUDA_VERSION}" \
+      com.nvidia.volumes.needed="nvidia_driver"
+
+
+
+# Python binary and source dependencies and Development tools
+RUN echo 'PS1="\u@\h:\w\\$ \[$(tput sgr0)\]"' >> /root/.bashrc \
+    && echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf \
+    && echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf \
+    && chgrp -R root /opt \
+    && useradd -m -d /home/default default \
+    && chmod -R ug+rwx /home/default \
+    && chmod -R ug+rwx /opt \
+    && chgrp root /etc/passwd \
+    && chmod ug+rw /etc/passwd \
+    && usermod -g root $NB_USER \
+    && yum install -y epel-release \
+    && yum install dkms protobuf-compiler unzip wget -y \
+    && yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
+    && yum install -y https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-repo-rhel7-8.0.61-1.x86_64.rpm \
+    && yum install -y cuda-9.0.176-1  \
+    && curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py \
+    && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && wget -q https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini -P /tmp \
+    && wget -q https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc -P /tmp \
+    && cd /tmp  \
+    && gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 0527A9B7 && gpg --verify /tmp/tini.asc \
+    && mv /tmp/tini /usr/local/bin/tini \
+    && chmod +x /usr/local/bin/tini \
+    && yum install -y curl wget bzip2 gnupg2 sqlite3 epel-release tar git gcc gcc-c++ glibc-devel which tree
+
+
+
+USER $NB_USER
+
+# Make the default PWD somewhere that the user can write. This is
+# useful when connecting with 'oc run' and starting a 'spark-shell',
+# which will likely try to create files and directories in PWD and
+# error out if it cannot. 
+# 
+ADD fix-permissions.sh /usr/local/bin/fix-permissions.sh 
+
+RUN mkdir $HOME/workspace \
+    && cd /tmp \
+    && wget -q https://repo.continuum.io/miniconda/Miniconda3-4.2.12-Linux-x86_64.sh \
+    && echo d0c7c71cc5659e54ab51f2005a8d96f3 Miniconda3-4.2.12-Linux-x86_64.sh | md5sum -c - \
+    && bash Miniconda3-4.2.12-Linux-x86_64.sh -b -p $CONDA_DIR \
+    && rm Miniconda3-4.2.12-Linux-x86_64.sh \
+    && export PATH=/opt/conda/bin:$PATH \
+    && $CONDA_DIR/bin/conda install --quiet --yes python=$NB_PYTHON_VER 'nomkl' \
+                'ipywidgets=5.2*' \
+                'matplotlib=1.5*' \
+                'scipy=0.17*' \
+                'seaborn=0.7*' \
+                'cloudpickle=0.1*' \
+                statsmodels \
+                pandas \
+                'dill=0.2*' \
+                jupyter \
+                notebook \
+                scikit-learn \
+                psutil \
+                pillow \
+                nltk \
+                gitpython \
+                requests \
+    && $CONDA_DIR/bin/conda remove --quiet --yes --force qt pyqt \
+    && $CONDA_DIR/bin/conda clean -tipsy \
+    && fix-permissions.sh $CONDA_DIR \
+    && fix-permissions.sh $HOME 
+
+
+USER root
+
+
+# TensorBoard # IPython
+EXPOSE 6006 8888
+WORKDIR $HOME
+
+RUN mkdir /workspace && chown $NB_UID:root /workspace \
+    && mkdir -p $HOME/.jupyter \
+    && echo "c.NotebookApp.ip = '*'" >> $HOME/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.open_browser = False" >> $HOME/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.notebook_dir = '/workspace'" >> $HOME/.jupyter/jupyter_notebook_config.py \
+    && fix-permissions.sh $CONDA_DIR \
+    && fix-permissions.sh /workspace \
+    && fix-permissions.sh $HOME
+
+
+
+ADD start.sh /usr/local/bin/start.sh
+ADD entrypoint /entrypoint
+
+
+ENTRYPOINT ["/entrypoint"]
+CMD ["start.sh"]
+
+USER $NB_USER
+
